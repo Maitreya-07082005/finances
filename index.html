@@ -10,7 +10,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: linear-gradient(120deg, #f3ec78, #af4261);
+            background: linear-gradient(120deg, #84fab0, #8fd3f4);
             color: #333;
             display: flex;
             flex-direction: column;
@@ -23,6 +23,7 @@
             width: 100%;
             padding: 1rem 2rem;
             text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .container {
             background: #fff;
@@ -36,7 +37,7 @@
         h2 {
             text-align: center;
             margin-bottom: 20px;
-            color: #af4261;
+            color: #0066cc;
         }
         input, select, button {
             width: 100%;
@@ -46,29 +47,17 @@
             border-radius: 4px;
         }
         button {
-            background-color: #af4261;
+            background-color: #0066cc;
             color: #fff;
             border: none;
             cursor: pointer;
             font-weight: bold;
         }
         button:hover {
-            background-color: #f06292;
+            background-color: #005bb5;
         }
         canvas {
             margin: 20px auto;
-        }
-        #search-container {
-            margin-top: 20px;
-        }
-        #search-container input {
-            margin-bottom: 10px;
-            width: calc(100% - 120px);
-            display: inline-block;
-        }
-        #search-container button {
-            width: 100px;
-            display: inline-block;
         }
     </style>
 </head>
@@ -93,18 +82,8 @@
         <input type="number" id="amount" placeholder="Amount" step="0.01">
         <button onclick="addTransaction()">Add Transaction</button>
 
-        <div id="search-container">
-            <h2>Search Transaction by Date</h2>
-            <input type="date" id="search-date">
-            <button onclick="searchTransaction()">Search</button>
-        </div>
-
-        <div>
-            <h2>Visualizations</h2>
-            <canvas id="pieChart"></canvas>
-            <canvas id="barChart"></canvas>
-            <canvas id="lineChart"></canvas>
-        </div>
+        <h2>Visualizations</h2>
+        <canvas id="pieChart"></canvas>
     </div>
 
     <script>
@@ -125,96 +104,51 @@
             transactions.push(transaction);
             localStorage.setItem("transactions", JSON.stringify(transactions));
             alert("Transaction added!");
-            updateCharts();
+            updatePieChart();
         };
 
-        const searchTransaction = () => {
-            const searchDate = document.getElementById("search-date").value;
-            if (!searchDate) {
-                alert("Please enter a date to search.");
-                return;
-            }
-            const results = transactions.filter(t => t.date === searchDate);
-            if (results.length === 0) {
-                alert("No transactions found for this date.");
-                return;
-            }
-            alert(`Transactions for ${searchDate}:\n` + results.map(r => `Category: ${r.category}, Type: ${r.type}, Amount: ${r.amount}`).join("\n"));
-        };
-
-        const updateCharts = () => {
-            const categories = {};
-            const incomeExpense = { Income: 0, Expense: 0 };
-            const dailyTotals = {};
-
-            transactions.forEach(({ date, category, type, amount }) => {
-                // Aggregate category-wise
+        const updatePieChart = () => {
+            const categoryTotals = {};
+            transactions.forEach(({ category, type, amount }) => {
                 if (type === "Expense") {
-                    categories[category] = (categories[category] || 0) + amount;
+                    categoryTotals[category] = (categoryTotals[category] || 0) + amount;
                 }
-                // Aggregate income vs expense
-                incomeExpense[type] += amount;
-
-                // Aggregate daily totals
-                dailyTotals[date] = (dailyTotals[date] || 0) + (type === "Income" ? amount : -amount);
             });
 
-            // Update Pie Chart
-            pieChart.data.labels = Object.keys(categories);
-            pieChart.data.datasets[0].data = Object.values(categories);
-            pieChart.update();
-
-            // Update Bar Chart
-            barChart.data.labels = Object.keys(incomeExpense);
-            barChart.data.datasets[0].data = Object.values(incomeExpense);
-            barChart.update();
-
-            // Update Line Chart
-            const sortedDates = Object.keys(dailyTotals).sort();
-            lineChart.data.labels = sortedDates;
-            lineChart.data.datasets[0].data = sortedDates.map(date => dailyTotals[date]);
-            lineChart.update();
+            const pieChart = new Chart(document.getElementById("pieChart").getContext("2d"), {
+                type: "pie",
+                data: {
+                    labels: Object.keys(categoryTotals),
+                    datasets: [{
+                        label: "Expenses by Category",
+                        data: Object.values(categoryTotals),
+                        backgroundColor: [
+                            "#ff6384", "#36a2eb", "#ffce56", "#4bc0c0", "#9966ff", "#ff9f40"
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let percentage = ((context.raw / 
+                                        Object.values(categoryTotals).reduce((a, b) => a + b, 0)) * 100).toFixed(1);
+                                    return `${context.label}: $${context.raw} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         };
 
-        const pieChart = new Chart(document.getElementById("pieChart").getContext("2d"), {
-            type: "pie",
-            data: {
-                labels: [],
-                datasets: [{
-                    label: "Expenses by Category",
-                    data: [],
-                    backgroundColor: ["#ff6384", "#36a2eb", "#ffce56", "#4bc0c0", "#9966ff"],
-                }]
-            }
-        });
-
-        const barChart = new Chart(document.getElementById("barChart").getContext("2d"), {
-            type: "bar",
-            data: {
-                labels: [],
-                datasets: [{
-                    label: "Income vs Expenses",
-                    data: [],
-                    backgroundColor: ["#36a2eb", "#ff6384"],
-                }]
-            }
-        });
-
-        const lineChart = new Chart(document.getElementById("lineChart").getContext("2d"), {
-            type: "line",
-            data: {
-                labels: [],
-                datasets: [{
-                    label: "Cumulative Daily Totals",
-                    data: [],
-                    borderColor: "#36a2eb",
-                    fill: false,
-                }]
-            }
-        });
-
-        // Load existing data into charts
-        window.onload = updateCharts;
+        // Load existing data into the pie chart
+        window.onload = updatePieChart;
     </script>
 </body>
 </html>
