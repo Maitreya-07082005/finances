@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Finance Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Styling for body and layout */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -55,27 +55,20 @@
         button:hover {
             background-color: #f06292;
         }
-        .transactions {
+        canvas {
+            margin: 20px auto;
+        }
+        #search-container {
             margin-top: 20px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
+        #search-container input {
+            margin-bottom: 10px;
+            width: calc(100% - 120px);
+            display: inline-block;
         }
-        th, td {
-            padding: 10px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-        th {
-            background-color: #f06292;
-            color: #fff;
-        }
-        .search-bar {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
+        #search-container button {
+            width: 100px;
+            display: inline-block;
         }
     </style>
 </head>
@@ -99,40 +92,24 @@
         </select>
         <input type="number" id="amount" placeholder="Amount" step="0.01">
         <button onclick="addTransaction()">Add Transaction</button>
-        <div class="search-bar">
-            <input type="date" id="searchDate" placeholder="Search by Date">
-            <button onclick="searchTransactions()">Search</button>
+
+        <div id="search-container">
+            <h2>Search Transaction by Date</h2>
+            <input type="date" id="search-date">
+            <button onclick="searchTransaction()">Search</button>
         </div>
-        <div class="transactions">
-            <h2>Transactions</h2>
-            <table id="transactionTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Category</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Transactions will be added here dynamically -->
-                </tbody>
-            </table>
+
+        <div>
+            <h2>Visualizations</h2>
+            <canvas id="pieChart"></canvas>
+            <canvas id="barChart"></canvas>
+            <canvas id="lineChart"></canvas>
         </div>
     </div>
+
     <script>
-        const transactionTable = document.getElementById("transactionTable").getElementsByTagName("tbody")[0];
+        const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
 
-        // Load transactions from localStorage
-        const loadTransactions = () => {
-            const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
-            transactionTable.innerHTML = "";
-            transactions.forEach(transaction => {
-                addRow(transaction);
-            });
-        };
-
-        // Add transaction
         const addTransaction = () => {
             const date = document.getElementById("date").value;
             const category = document.getElementById("category").value;
@@ -145,41 +122,99 @@
             }
 
             const transaction = { date, category, type, amount };
-            const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
             transactions.push(transaction);
             localStorage.setItem("transactions", JSON.stringify(transactions));
-
-            addRow(transaction);
             alert("Transaction added!");
+            updateCharts();
         };
 
-        // Add a row to the table
-        const addRow = (transaction) => {
-            const row = transactionTable.insertRow();
-            row.insertCell(0).textContent = transaction.date;
-            row.insertCell(1).textContent = transaction.category;
-            row.insertCell(2).textContent = transaction.type;
-            row.insertCell(3).textContent = transaction.amount.toFixed(2);
+        const searchTransaction = () => {
+            const searchDate = document.getElementById("search-date").value;
+            if (!searchDate) {
+                alert("Please enter a date to search.");
+                return;
+            }
+            const results = transactions.filter(t => t.date === searchDate);
+            if (results.length === 0) {
+                alert("No transactions found for this date.");
+                return;
+            }
+            alert(`Transactions for ${searchDate}:\n` + results.map(r => `Category: ${r.category}, Type: ${r.type}, Amount: ${r.amount}`).join("\n"));
         };
 
-        // Search transactions by date
-        const searchTransactions = () => {
-            const searchDate = document.getElementById("searchDate").value;
-            const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
-            const filtered = transactions.filter(transaction => transaction.date === searchDate);
+        const updateCharts = () => {
+            const categories = {};
+            const incomeExpense = { Income: 0, Expense: 0 };
+            const dailyTotals = {};
 
-            transactionTable.innerHTML = "";
-            filtered.forEach(transaction => {
-                addRow(transaction);
+            transactions.forEach(({ date, category, type, amount }) => {
+                // Aggregate category-wise
+                if (type === "Expense") {
+                    categories[category] = (categories[category] || 0) + amount;
+                }
+                // Aggregate income vs expense
+                incomeExpense[type] += amount;
+
+                // Aggregate daily totals
+                dailyTotals[date] = (dailyTotals[date] || 0) + (type === "Income" ? amount : -amount);
             });
 
-            if (filtered.length === 0) {
-                alert("No transactions found for the selected date.");
-            }
+            // Update Pie Chart
+            pieChart.data.labels = Object.keys(categories);
+            pieChart.data.datasets[0].data = Object.values(categories);
+            pieChart.update();
+
+            // Update Bar Chart
+            barChart.data.labels = Object.keys(incomeExpense);
+            barChart.data.datasets[0].data = Object.values(incomeExpense);
+            barChart.update();
+
+            // Update Line Chart
+            const sortedDates = Object.keys(dailyTotals).sort();
+            lineChart.data.labels = sortedDates;
+            lineChart.data.datasets[0].data = sortedDates.map(date => dailyTotals[date]);
+            lineChart.update();
         };
 
-        // Load transactions on page load
-        window.onload = loadTransactions;
+        const pieChart = new Chart(document.getElementById("pieChart").getContext("2d"), {
+            type: "pie",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Expenses by Category",
+                    data: [],
+                    backgroundColor: ["#ff6384", "#36a2eb", "#ffce56", "#4bc0c0", "#9966ff"],
+                }]
+            }
+        });
+
+        const barChart = new Chart(document.getElementById("barChart").getContext("2d"), {
+            type: "bar",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Income vs Expenses",
+                    data: [],
+                    backgroundColor: ["#36a2eb", "#ff6384"],
+                }]
+            }
+        });
+
+        const lineChart = new Chart(document.getElementById("lineChart").getContext("2d"), {
+            type: "line",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Cumulative Daily Totals",
+                    data: [],
+                    borderColor: "#36a2eb",
+                    fill: false,
+                }]
+            }
+        });
+
+        // Load existing data into charts
+        window.onload = updateCharts;
     </script>
 </body>
 </html>
