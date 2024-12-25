@@ -4,49 +4,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Finance Manager</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* Styling for body and layout */
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
-            max-width: 800px;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(120deg, #f3ec78, #af4261);
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
-        h1 {
+        header {
+            background-color: #333;
+            color: #fff;
+            width: 100%;
+            padding: 1rem 2rem;
             text-align: center;
         }
-        .input-container {
-            margin-bottom: 20px;
+        .container {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
         }
-        .input-container label {
-            margin-right: 10px;
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #af4261;
+        }
+        input, select, button {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #af4261;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #f06292;
+        }
+        .transactions {
+            margin-top: 20px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ccc;
+            margin-top: 10px;
         }
         th, td {
-            padding: 8px;
-            text-align: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
         }
-        canvas {
-            max-width: 100%;
-            height: 400px;
+        th {
+            background-color: #f06292;
+            color: #fff;
+        }
+        .search-bar {
+            display: flex;
+            gap: 10px;
             margin-top: 20px;
         }
     </style>
 </head>
 <body>
-    <h1>Personal Finance Manager</h1>
-    
-    <!-- Transaction Input Section -->
-    <div class="input-container">
-        <label for="date">Date:</label>
-        <input type="date" id="date" required>
-        <label for="category">Category:</label>
+    <header>
+        <h1>Personal Finance Manager</h1>
+    </header>
+    <div class="container">
+        <h2>Add a Transaction</h2>
+        <input type="date" id="date" placeholder="Date">
         <select id="category">
             <option value="Personal Use">Personal Use</option>
             <option value="Food">Food</option>
@@ -54,119 +93,93 @@
             <option value="Bills">Bills</option>
             <option value="Others">Others</option>
         </select>
-        <label for="type">Type:</label>
         <select id="type">
             <option value="Income">Income</option>
             <option value="Expense">Expense</option>
         </select>
-        <label for="amount">Amount:</label>
-        <input type="number" id="amount" min="0" step="0.01" required>
+        <input type="number" id="amount" placeholder="Amount" step="0.01">
         <button onclick="addTransaction()">Add Transaction</button>
+        <div class="search-bar">
+            <input type="date" id="searchDate" placeholder="Search by Date">
+            <button onclick="searchTransactions()">Search</button>
+        </div>
+        <div class="transactions">
+            <h2>Transactions</h2>
+            <table id="transactionTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Transactions will be added here dynamically -->
+                </tbody>
+            </table>
+        </div>
     </div>
-    
-    <!-- Transactions Table -->
-    <h3>Transactions</h3>
-    <table id="transactions-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th>Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Transactions will appear here -->
-        </tbody>
-    </table>
-    
-    <!-- Pie Chart Section -->
-    <h3>Visualize Expenses</h3>
-    <label for="month-selector">Select Month:</label>
-    <input type="number" id="month-selector" min="1" max="12" placeholder="Enter Month (1-12)">
-    <button onclick="generatePieChart()">Generate Pie Chart</button>
-    <canvas id="pieChart"></canvas>
-    
     <script>
-        const transactions = [];
+        const transactionTable = document.getElementById("transactionTable").getElementsByTagName("tbody")[0];
 
-        // Function to add a transaction
-        function addTransaction() {
+        // Load transactions from localStorage
+        const loadTransactions = () => {
+            const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+            transactionTable.innerHTML = "";
+            transactions.forEach(transaction => {
+                addRow(transaction);
+            });
+        };
+
+        // Add transaction
+        const addTransaction = () => {
             const date = document.getElementById("date").value;
             const category = document.getElementById("category").value;
             const type = document.getElementById("type").value;
             const amount = parseFloat(document.getElementById("amount").value);
-            
-            if (!date || isNaN(amount)) {
-                alert("Please fill in all fields correctly.");
+
+            if (!date || !amount) {
+                alert("Please fill all fields.");
                 return;
             }
 
-            transactions.push({ date, category, type, amount });
+            const transaction = { date, category, type, amount };
+            const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+            transactions.push(transaction);
+            localStorage.setItem("transactions", JSON.stringify(transactions));
 
-            // Add transaction to table
-            const table = document.getElementById("transactions-table").querySelector("tbody");
-            const row = table.insertRow();
-            row.insertCell(0).innerText = date;
-            row.insertCell(1).innerText = category;
-            row.insertCell(2).innerText = type;
-            row.insertCell(3).innerText = amount.toFixed(2);
+            addRow(transaction);
+            alert("Transaction added!");
+        };
 
-            // Clear input fields
-            document.getElementById("date").value = "";
-            document.getElementById("amount").value = "";
-        }
+        // Add a row to the table
+        const addRow = (transaction) => {
+            const row = transactionTable.insertRow();
+            row.insertCell(0).textContent = transaction.date;
+            row.insertCell(1).textContent = transaction.category;
+            row.insertCell(2).textContent = transaction.type;
+            row.insertCell(3).textContent = transaction.amount.toFixed(2);
+        };
 
-        // Function to generate a pie chart
-        function generatePieChart() {
-            const month = parseInt(document.getElementById("month-selector").value);
-            if (isNaN(month) || month < 1 || month > 12) {
-                alert("Please enter a valid month (1-12).");
-                return;
-            }
+        // Search transactions by date
+        const searchTransactions = () => {
+            const searchDate = document.getElementById("searchDate").value;
+            const transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+            const filtered = transactions.filter(transaction => transaction.date === searchDate);
 
-            // Filter transactions by selected month and type
-            const monthlyExpenses = transactions
-                .filter(t => t.type === "Expense" && new Date(t.date).getMonth() + 1 === month)
-                .reduce((acc, t) => {
-                    acc[t.category] = (acc[t.category] || 0) + t.amount;
-                    return acc;
-                }, {});
-
-            if (Object.keys(monthlyExpenses).length === 0) {
-                alert(`No expenses found for Month ${month}.`);
-                return;
-            }
-
-            // Prepare data for the chart
-            const labels = Object.keys(monthlyExpenses);
-            const data = Object.values(monthlyExpenses);
-
-            // Render the pie chart
-            const ctx = document.getElementById("pieChart").getContext("2d");
-            new Chart(ctx, {
-                type: "pie",
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: `Expenses for Month ${month}`
-                        }
-                    }
-                }
+            transactionTable.innerHTML = "";
+            filtered.forEach(transaction => {
+                addRow(transaction);
             });
-        }
+
+            if (filtered.length === 0) {
+                alert("No transactions found for the selected date.");
+            }
+        };
+
+        // Load transactions on page load
+        window.onload = loadTransactions;
     </script>
 </body>
 </html>
